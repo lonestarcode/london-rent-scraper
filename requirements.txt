@@ -1,0 +1,26 @@
+# Core requirements
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+Flask>=3.0.0
+
+# Proxy and CAPTCHA handling
+2captcha-python>=1.2.0
+requests-toolbelt>=1.0.0
+
+# Date handling and utilities
+python-dateutil>=2.8.2
+python-dotenv>=1.0.0
+
+# HTTP utilities
+urllib3>=2.0.0
+certifi>=2023.7.22
+
+# Optional but recommended
+logging>=0.4.9.6  # For better logging capabilities
+gunicorn>=21.2.0  # For production deployment
+
+# If using Scrapy or Selenium, add as needed:
+# Scrapy==2.9.0
+# selenium==4.10.0
+scrapy==2.9.0
+selenium==4.10.0
