@@ -76,28 +76,98 @@ def scrape_rightmove(output_csv='rightmove_data.csv'):
         logging.warning(f"Failed pages: {failed_pages}")
 
 def parse_property_card(card):
-    """Extract data from a property card"""
+    """Extract data from a property card with multiple fallback selectors"""
     try:
-        address = card.select_one("address.propertyCard-address").text.strip()
-        price = clean_price(card.select_one("div.propertyCard-priceValue").text)
-        property_type = card.select_one("h2.propertyCard-title").text.strip()
-        size = extract_size(card.select_one("div.propertyCard-size").text if card.select_one("div.propertyCard-size") else None)
-        coordinates = card.get('data-lat-lng', '0,0').split(',')
-        
-        return {
-            "url": f"https://www.rightmove.co.uk{card.select_one('a.propertyCard-link')['href']}",
-            "address": clean_address(address),
-            "monthly_price": price,
-            "property_type": property_type,
-            "size_sqm": size,
-            "latitude": float(coordinates[0]),
-            "longitude": float(coordinates[1]),
-            "deposit": price * 5 if price else None,
-            "available_from": card.select_one("div.propertyCard-available").text.strip() if card.select_one("div.propertyCard-available") else None
-        }
+        # Extract address with fallbacks
+        address = extract_text(card, [
+            "address.propertyCard-address",
+            ".property-address",
+            "[data-test='address']",
+            "[itemprop='address']"
+        ])
+
+        # Extract price with fallbacks
+        price = extract_price(card, [
+            "div.propertyCard-priceValue",
+            ".property-price",
+            "[data-test='price']",
+            "[itemprop='price']"
+        ])
+
+        # Extract property type with fallbacks
+        property_type = extract_text(card, [
+            "h2.propertyCard-title",
+            ".property-type",
+            "[data-test='property-type']"
+        ])
+
+        # Extract size with fallbacks
+        size = extract_size_from_element(card, [
+            "div.propertyCard-size",
+            ".property-size",
+            "[data-test='size']"
+        ])
+
+        # Extract coordinates with fallbacks
+        coordinates = (
+            card.get('data-lat-lng') or
+            card.get('data-coordinates') or
+            '0,0'
+        ).split(',')
+
+        # Extract URL with fallbacks
+        url = extract_url(card, [
+            "a.propertyCard-link",
+            ".property-link",
+            "[data-test='property-link']"
+        ])
+
+        # Only return listing if we have essential data
+        if address and price and url:
+            return {
+                "url": url,
+                "address": clean_address(address),
+                "monthly_price": price,
+                "property_type": property_type,
+                "size_sqm": size,
+                "latitude": float(coordinates[0]),
+                "longitude": float(coordinates[1]),
+                "deposit": price * 5 if price else None,
+                "available_from": extract_text(card, [
+                    "div.propertyCard-available",
+                    ".property-available",
+                    "[data-test='available-from']"
+                ])
+            }
     except Exception as e:
         logging.error(f"Error parsing property card: {e}")
-        return None
+    return None
+
+def extract_url(card, selectors):
+    """Extract listing URL with fallbacks"""
+    for selector in selectors:
+        link = card.select_one(selector)
+        if link and link.get('href'):
+            return f"https://www.rightmove.co.uk{link['href']}"
+    return None
+
+def extract_text(element, selectors):
+    """Try multiple selectors to extract text"""
+    for selector in selectors:
+        found = element.select_one(selector)
+        if found:
+            return found.text.strip()
+    return None
+
+def extract_price(element, selectors):
+    """Try multiple selectors to extract and clean price"""
+    price_text = extract_text(element, selectors)
+    return clean_price(price_text) if price_text else None
+
+def extract_size_from_element(element, selectors):
+    """Try multiple selectors to extract size"""
+    size_text = extract_text(element, selectors)
+    return extract_size(size_text) if size_text else None
 
 def save_results(listings, output_csv):
     """Save results to CSV file"""
